@@ -1,84 +1,99 @@
 package main
 
 import (
-	"encoding/json"
-	"io"
-	"io/ioutil"
 	"log"
-	"log/syslog"
 	"os"
-	"os/signal"
 
-	"syscall"
-
-	"github.com/fsnotify/fsnotify"
+	"github.com/nickrobison/backer/daemon"
+	"gopkg.in/urfave/cli.v1"
 )
 
 var logger *log.Logger
+var rpcClient *RPC
 
 func init() {
-	syslogger, err := syslog.New(syslog.LOG_NOTICE, "backer")
-	if err != nil {
-		panic(err)
-	}
-	logger = log.New(io.MultiWriter(syslogger, os.Stdout), "backer", log.Lshortfile)
+	logger = log.New(os.Stdout, "backer:", log.Lshortfile)
 }
 
 func main() {
-	logger.Println("Starting up")
 
-	// Read in the config file
-	file, err := ioutil.ReadFile("./config.json")
-	if err != nil {
-		logger.Fatalln("Missing config file")
-	}
+	app := cli.NewApp()
 
-	var config backerConfig
-	err = json.Unmarshal(file, &config)
-	if err != nil {
-		logger.Fatalln(err)
-	}
+	app.Version = "0.0.1"
 
-	// Validate the paths
-	err = config.validateWatcherPaths()
-	if err != nil {
-		logger.Fatalln(err)
-	}
+	// Flags
+	app.Flags = buildFlags()
+	app.Action = parseFlags
 
-	// Register the shutdown handler
-	done := make(chan bool)
-	go shutdown(done)
+	// Commands
+	app.Commands = buildCommnds()
 
-	// Create a new watcher
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		logger.Fatalln(err)
-	}
-	defer watcher.Close()
-
-	// Create new uploader
-	s3Client := NewS3Uploader(&config.S3)
-
-	// Register new file manager
-	fm := NewFileManager(&config, s3Client)
-
-	// Register all watchers
-	for _, newWatcher := range config.Watchers {
-		fm.RegisterWatcherPath(newWatcher.GetPath(), newWatcher.BucketPath)
-		err = watcher.Add(newWatcher.GetPath())
-		if err != nil {
-			logger.Fatalln(err)
-		}
-	}
-	fm.Start(watcher.Events, watcher.Errors)
-	<-done
+	app.Run(os.Args)
 }
 
-func shutdown(done chan bool) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
-	logger.Println("Shutting down")
-	// Cleanup code
-	done <- true
+func buildFlags() []cli.Flag {
+	return []cli.Flag{
+		cli.BoolFlag{
+			Name:  "daemon",
+			Usage: "Run the backer daemon",
+		},
+		cli.StringFlag{
+			Name:  "config, c",
+			Value: "./config.json",
+			Usage: "Load config from `FILE`",
+		},
+	}
 }
+
+func buildCommnds() []cli.Command {
+
+	return []cli.Command{
+		{
+			Name:    "list",
+			Aliases: []string{"l"},
+			Usage:   "List ...",
+			Subcommands: []cli.Command{
+				{
+					Name:    "watchers",
+					Aliases: []string{"w"},
+					Usage:   "List registered watchers",
+					Action:  listWatchers,
+				},
+				{
+					Name:    "objects",
+					Aliases: []string{"o"},
+					Usage:   "List objects in S3 Bucket",
+					Action:  listObjects,
+				},
+				{
+					Name:    "versions",
+					Aliases: []string{"v"},
+					Usage:   "List versions for given object",
+					Action:  listObjectVersions,
+				},
+			},
+		},
+	}
+}
+
+func parseFlags(c *cli.Context) error {
+	if c.Bool("daemon") {
+		logger.Println("Launching daemon")
+		daemon.Start(c.String("config"))
+	} else {
+		rpcClient = &RPC{}
+	}
+	return nil
+}
+
+// func startRPC() {
+// 	logger.Panicln("Calling RPC server")
+// 	client, err := rpc.Dial("unix", "/tmp/backer.sock")
+// 	if err != nil {
+// 		logger.Fatalln(err)
+// 	}
+
+// 	rpcClient = &RPC{
+// 		client: client,
+// 	}
+// }
