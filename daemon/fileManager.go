@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -37,15 +38,15 @@ func (b *BackerEvent) equals(other BackerEvent) bool {
 type fileManager struct {
 	config       *backerConfig
 	backlog      Backlog
-	uploader     Uploader
+	uploaders    *[]Uploader
 	watcherRoots map[string]string
 }
 
-func NewFileManager(config *backerConfig, uploader Uploader) *fileManager {
+func NewFileManager(config *backerConfig) *fileManager {
 	return &fileManager{
 		config:       config,
 		backlog:      NewMultiFileBacklog(),
-		uploader:     uploader,
+		uploaders:    &config.Backends,
 		watcherRoots: make(map[string]string),
 	}
 }
@@ -94,7 +95,7 @@ func (f *fileManager) handleFileEvents(config *backerConfig, eventChannel <-chan
 			}
 		case err := <-errorChannel:
 			{
-				// When the application shutdown
+				// When the application shutsdown
 				if err != nil {
 					logger.Fatalln(err)
 				}
@@ -133,10 +134,22 @@ func (f *fileManager) handleFile(in <-chan BackerEvent) {
 	for event := range in {
 		if event.Type == REMOVE {
 			logger.Printf("Removing %s from %s\n", event.Path, f.watcherRoots[event.Path])
-			go f.uploader.DeleteFile(event.Path, f.watcherRoots[event.Path])
+			uploaderRef := *f.uploaders
+			go uploaderRef[0].DeleteFile(event.Path, f.watcherRoots[event.Path])
 		} else {
+			// Create a wait group
+			var wg sync.WaitGroup
+			wg.Add(len(*f.uploaders))
+
 			logger.Printf("Uploading %s from %s\n", event.Path, f.watcherRoots[event.Path])
-			go f.uploader.UploadFile(event.Path, f.watcherRoots[event.Path])
+			for _, uploader := range *f.uploaders {
+				go func(u Uploader, event *BackerEvent) {
+					defer wg.Done()
+					u.UploadFile(event.Path, f.watcherRoots[event.Path])
+				}(uploader, &event)
+			}
+			wg.Wait()
+			// go f.uploaders.UploadFile(event.Path, f.watcherRoots[event.Path])
 		}
 	}
 }

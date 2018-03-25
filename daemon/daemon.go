@@ -25,7 +25,7 @@ func init() {
 }
 
 // Start backer daemon
-// Registers an S3 uploader and a fileManager to
+// Registers an S3 uploader and a fileManager to watch the watchers
 func Start(configLocation string) {
 	logger.Println("Starting up Backer daemon")
 
@@ -59,10 +59,14 @@ func Start(configLocation string) {
 	defer watcher.Close()
 
 	// Create new uploader
+	var clients []Uploader
+
 	s3Client := NewS3Uploader(&config.S3)
+	clients = append(clients, s3Client)
+	config.Backends = clients
 
 	// Register new file manager
-	fm := NewFileManager(&config, s3Client)
+	fm := NewFileManager(&config)
 
 	// Register all watchers
 	for _, newWatcher := range config.Watchers {
@@ -75,7 +79,7 @@ func Start(configLocation string) {
 	fm.Start(watcher.Events, watcher.Errors)
 
 	// Start listener
-	go StartSocket(&config)
+	go startSocket(&config)
 	logger.Println("Ready to listen")
 	<-done
 }

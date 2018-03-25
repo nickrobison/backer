@@ -13,12 +13,12 @@ func (e *pathError) Error() string {
 	return "Resource: " + e.location + " does not exist"
 }
 
-type watcher struct {
+type Watcher struct {
 	BucketPath string `json:"bucketPath"`
 	Path       string `json:"path"`
 }
 
-func (w *watcher) GetPath() string {
+func (w *Watcher) GetPath() string {
 	path, err := filepath.Abs(w.Path)
 	if err != nil {
 		logger.Fatalln(err)
@@ -30,8 +30,9 @@ func (w *watcher) GetPath() string {
 type backerConfig struct {
 	DeleteOnRemove   bool      `json:"deleteOnRemove"`
 	DeleteOnShutdown bool      `json:"deleteOnShutdown"`
-	Watchers         []watcher `json:"watchers"`
+	Watchers         []Watcher `json:"watchers"`
 	S3               s3Options `json:"s3"`
+	Backends         []Uploader
 }
 
 type s3Options struct {

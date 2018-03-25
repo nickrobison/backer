@@ -18,7 +18,7 @@ const unixSocket = "/tmp/backer.sock"
 //     logger.Println(string(buf))
 // }
 
-func StartSocket(c *backerConfig) {
+func startSocket(c *backerConfig) {
 	logger.Println("Listening on unix socket:", unixSocket)
 	l, err := net.Listen("unix", unixSocket)
 	if err != nil {
@@ -31,15 +31,6 @@ func StartSocket(c *backerConfig) {
 	server := rpc.NewServer()
 	server.RegisterName("RPC", cliRPC)
 	server.Accept(l)
-	// for {
-	//     fd, err := l.Accept()
-	//     if err != nil {
-	//         logger.Fatalln(err)
-	//         return
-	//     }
-	//     dataHandler(fd)
-	//     fd.Close()
-	// }
 }
 
 func removeSocket() {
