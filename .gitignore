@@ -30,5 +30,6 @@ _testmain.go
 .vscode/
 
 #Any config files in the directory
-config.json
+/config.json
 test/
+debug

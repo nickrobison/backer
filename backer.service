@@ -1,0 +1,19 @@
+[Unit]
+Description=Configuration file backup service
+ConditionPathExists=/usr/bin/backer
+After=network.target
+ 
+[Service]
+Type=simple
+User=backer
+Group=backer
+LimitNOFILE=1024
+
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=60
+
+ExecStart=/usr/bin/backer --config=/etc/backer/config.json
+ 
+[Install]
+WantedBy=multi-user.target
