@@ -44,3 +44,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/olekukonko/tablewriter"
+
+[[constraint]]
+  name = "github.com/coreos/go-systemd"
+  version = "16.0.0"

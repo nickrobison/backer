@@ -38,6 +38,12 @@
   version = "v1.13.19"
 
 [[projects]]
+  name = "github.com/coreos/go-systemd"
+  packages = ["daemon"]
+  revision = "40e2722dffead74698ca12a750f64ef313ddce05"
+  version = "v16"
+
+[[projects]]
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
@@ -81,6 +87,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "565d706a29d661e9a8e3a193ded93df3cb2893c5eba069292306e93799029e29"
+  inputs-digest = "06d694edd71ff01860a844d999a3d060f00eaeb82bc8c2898182c0fd770794a8"
   solver-name = "gps-cdcl"
   solver-version = 1

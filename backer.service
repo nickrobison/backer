@@ -4,16 +4,15 @@ ConditionPathExists=/usr/bin/backer
 After=network.target
  
 [Service]
-Type=simple
+Type=notify
 User=backer
 Group=backer
 LimitNOFILE=1024
-
 Restart=on-failure
-RestartSec=10
+WatchdogSec=30s
 StartLimitIntervalSec=60
 
 ExecStart=/usr/bin/backer --config=/etc/backer/config.json
  
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target`

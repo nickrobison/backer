@@ -6,9 +6,10 @@ import (
 	"log"
 	"os"
 	"os/signal"
-
 	"syscall"
+	"time"
 
+	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -75,6 +76,23 @@ func Start(configLocation string) {
 	// Start listener
 	go startSocket(&config)
 	logger.Println("Ready to listen")
+
+	// Signal ready to systemd
+	systemd.SdNotify(false, "READY=1")
+
+	// Simple polling to tell systemd that we're alive
+	// Eventually this should actually check that things are working
+	go func() {
+		interval, err := systemd.SdWatchdogEnabled(false)
+		if err != nil || interval == 0 {
+			return
+		}
+		for {
+			systemd.SdNotify(false, "WATCHDOG=1")
+			time.Sleep(interval / 3)
+		}
+	}()
+
 	<-done
 }
 
