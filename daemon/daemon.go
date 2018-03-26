@@ -2,10 +2,8 @@ package daemon
 
 import (
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"log"
-	"log/syslog"
 	"os"
 	"os/signal"
 
@@ -17,11 +15,7 @@ import (
 var logger *log.Logger
 
 func init() {
-	syslogger, err := syslog.New(syslog.LOG_NOTICE, "backer-daemon")
-	if err != nil {
-		panic(err)
-	}
-	logger = log.New(io.MultiWriter(syslogger, os.Stdout), "backer-daemon:", log.Lshortfile)
+	logger = log.New(os.Stdout, "backer-daemon:", log.Lshortfile)
 }
 
 // Start backer daemon
