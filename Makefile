@@ -10,6 +10,16 @@ DOCKER_WDIR := /tmp/fpm
 DOCKER_FPM := fpm-ubuntu
 PLATFORMS := linux/amd64 linux/arm linux/arm64
 
+FPM_OPTS :=-s dir -v $(VERSION) -n $(PKGNAME) \
+  --license "$(LICENSE)" \
+  --vendor "$(VENDOR)" \
+  --maintainer "$(MAINTAINER)" \
+  --url "$(URL)" \
+  --description  "$(DESC)" \
+  --verbose
+
+DEB_OPTS := -t deb --deb-user $(USER) --after-install packaging/debian/backer.postinst
+
 test:
 	go test -v ./...
 

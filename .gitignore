@@ -33,3 +33,4 @@ _testmain.go
 /config.json
 test/
 debug
+bin/
