@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"io"
-	"os"
 	"path"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -192,8 +191,7 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 }
 
 // UploadFile to S3 Bucket
-func (s *S3Uploader) UploadFile(name string, remoteRoot string) {
-
+func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string) {
 	// Check if the file exists and if it matches what I need
 	// objectHead := s.getObjectDetails(s.buildObjectKey(name, remoteRoot))
 	// if objectHead != nil {
@@ -201,19 +199,18 @@ func (s *S3Uploader) UploadFile(name string, remoteRoot string) {
 	// 	logger.Println(objectHead.Metadata)
 	// }
 
-	// Should I lock this file?
-	file, err := os.Open(name)
-	if err != nil {
-		logger.Println(err)
-	}
-	defer file.Close()
+	// file, err := os.Open(name)
+	// if err != nil {
+	// 	logger.Println(err)
+	// }
+	// defer file.Close()
 
-	checksumChannel := make(chan string)
-	go func() {
-		checksumChannel <- generateSHA256Hash(file)
-	}()
+	// checksumChannel := make(chan string)
+	// go func() {
+	// 	checksumChannel <- generateSHA256Hash(data)
+	// }()
 
-	err = s.uploadObject(name, remoteRoot, file, <-checksumChannel)
+	err := s.uploadObject(name, remoteRoot, data, generateSHA256Hash(data))
 	if err != nil {
 		logger.Println(err)
 	}

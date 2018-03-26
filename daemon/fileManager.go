@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -11,7 +13,7 @@ const chmodMask fsnotify.Op = ^fsnotify.Op(0) ^ fsnotify.Chmod
 
 // Uploader - Primary interface to be implemented by the various backends
 type Uploader interface {
-	UploadFile(name string, remotePath string)
+	UploadFile(name string, data io.Reader, remotePath string)
 	DeleteFile(name string, remotePath string)
 }
 
@@ -147,19 +149,57 @@ func (f *FileManager) handleFile(in <-chan BackerEvent) {
 			uploaderRef := *f.uploaders
 			go uploaderRef[0].DeleteFile(event.Path, f.watcherRoots[event.Path])
 		} else {
-			// Create a wait group
+			// Create a wait group to synchronize all the backends
 			var wg sync.WaitGroup
 			wg.Add(len(*f.uploaders))
 
-			logger.Printf("Uploading %s from %s\n", event.Path, f.watcherRoots[event.Path])
-			for _, uploader := range *f.uploaders {
+			// Read in the file
+			// Should I lock this file?
+			file, err := os.Open(event.Path)
+			if err != nil {
+				logger.Println(err)
+			}
+			defer file.Close()
+
+			uploaderRef := f.uploaders
+			var pipeWriters = make([]io.Writer, len(*uploaderRef))
+
+			watcherPath := f.watcherRoots[event.Path]
+
+			logger.Printf("Uploading %s to %s\n", event.Path, watcherPath)
+			for idx, uploader := range *f.uploaders {
+				// For each uploader, create a new pipe writer
+				reader, writer := io.Pipe()
+				pipeWriters[idx] = writer
+
 				go func(u Uploader, event *BackerEvent) {
 					defer wg.Done()
-					u.UploadFile(event.Path, f.watcherRoots[event.Path])
+					u.UploadFile(event.Path, reader, watcherPath)
 				}(uploader, &event)
 			}
+
+			// Run this in a go routine, so that way when it returns, we close all the writers, otherwise they'll deadlock and never stop reading
+			go func() {
+				// Close all the writers
+				for _, writer := range pipeWriters {
+					// Cast this back to a PipeWriter, seems gross
+					defer writer.(*io.PipeWriter).Close()
+				}
+				// Create a multiwriter and read everything into it
+				mw := io.MultiWriter(pipeWriters...)
+				io.Copy(mw, file)
+			}()
 			wg.Wait()
-			// go f.uploaders.UploadFile(event.Path, f.watcherRoots[event.Path])
 		}
 	}
+}
+
+func closeWriter(writer *io.PipeWriter) {
+	logger.Println("Closing Writer")
+	writer.Close()
+}
+
+func closeReader(reader *io.PipeReader) {
+	logger.Println("Closing Readiner")
+	reader.Close()
 }

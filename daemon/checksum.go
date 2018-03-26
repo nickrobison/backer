@@ -2,19 +2,17 @@ package daemon
 
 import (
 	"crypto/sha256"
-	"io"
 	"encoding/hex"
+	"io"
 )
 
-
-
 func generateSHA256Hash(file io.Reader) string {
-    hash := sha256.New()
+	hash := sha256.New()
 
-    _, err := io.Copy(hash, file)
-    if err != nil {
-        logger.Panicln(err)
-    }
+	_, err := io.Copy(hash, file)
+	if err != nil {
+		logger.Panicln(err)
+	}
 
-    return hex.EncodeToString(hash.Sum(nil))
+	return hex.EncodeToString(hash.Sum(nil))
 }
