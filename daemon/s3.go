@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-// S3Uploader struct
+// S3Uploader struct which contains configuration settings for managing S3 Buckets
 type S3Uploader struct {
 	session *session.Session
 	client  *s3.S3
@@ -50,7 +50,7 @@ func (s *S3Uploader) createBucket() {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
 			case "BucketAlreadyExists":
-				logger.Panicf("Bucket %s already exists in the S3 system\n", s.config.Bucket)
+				logger.Panicf("Bucket %s already exists in the S3 system\nBuckets must have unique names.", s.config.Bucket)
 			case "BucketAlreadyOwnedByYou":
 				logger.Printf("Bucket %s already exists", s.config.Bucket)
 			default:

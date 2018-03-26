@@ -9,19 +9,25 @@ import (
 
 const chmodMask fsnotify.Op = ^fsnotify.Op(0) ^ fsnotify.Chmod
 
+// Uploader - Primary interface to be implemented by the various backends
 type Uploader interface {
 	UploadFile(name string, remotePath string)
 	DeleteFile(name string, remotePath string)
 }
 
+// Event - Event type from FSNotify
 type Event int
 
 const (
+	// CREATE - File is created
 	CREATE Event = 1 + iota
+	// REMOVE - File is removed
 	REMOVE
+	// WRITE - File is modified
 	WRITE
 )
 
+// BackerEvent - Event structure which contains a filepath and an event type
 type BackerEvent struct {
 	Type Event
 	Path string
@@ -35,15 +41,17 @@ func (b *BackerEvent) equals(other BackerEvent) bool {
 	return false
 }
 
-type fileManager struct {
+// FileManager - Manages the interaction between FSNotify events and the various data backends
+type FileManager struct {
 	config       *backerConfig
 	backlog      Backlog
 	uploaders    *[]Uploader
 	watcherRoots map[string]string
 }
 
-func NewFileManager(config *backerConfig) *fileManager {
-	return &fileManager{
+// NewFileManager - Helper function for creating a new FileManager
+func NewFileManager(config *backerConfig) *FileManager {
+	return &FileManager{
 		config:       config,
 		backlog:      NewMultiFileBacklog(),
 		uploaders:    &config.Backends,
@@ -51,7 +59,8 @@ func NewFileManager(config *backerConfig) *fileManager {
 	}
 }
 
-func (f *fileManager) Start(eventChannel <-chan fsnotify.Event, errorChannel <-chan error) {
+// Start - Start watching for File events
+func (f *FileManager) Start(eventChannel <-chan fsnotify.Event, errorChannel <-chan error) {
 	fileNameChannel := make(chan BackerEvent)
 	batchedChannel := make(chan BackerEvent)
 	go f.handleFileEvents(f.config, eventChannel, errorChannel, fileNameChannel)
@@ -60,7 +69,8 @@ func (f *fileManager) Start(eventChannel <-chan fsnotify.Event, errorChannel <-c
 
 }
 
-func (f *fileManager) RegisterWatcherPath(path string, remoteRoot string) {
+// RegisterWatcherPath - Register a file path with the Manager, will subscribe to FSEvents for this path
+func (f *FileManager) RegisterWatcherPath(path string, remoteRoot string) {
 	if _, ok := f.watcherRoots[path]; ok {
 		logger.Printf("Path %s already registered with watcher\n", path)
 		return
@@ -68,7 +78,7 @@ func (f *fileManager) RegisterWatcherPath(path string, remoteRoot string) {
 	f.watcherRoots[path] = remoteRoot
 }
 
-func (f *fileManager) handleFileEvents(config *backerConfig, eventChannel <-chan fsnotify.Event, errorChannel <-chan error, outputChannel chan<- BackerEvent) {
+func (f *FileManager) handleFileEvents(config *backerConfig, eventChannel <-chan fsnotify.Event, errorChannel <-chan error, outputChannel chan<- BackerEvent) {
 	logger.Println("Launching new file handler")
 	for {
 		select {
@@ -104,7 +114,7 @@ func (f *fileManager) handleFileEvents(config *backerConfig, eventChannel <-chan
 	}
 }
 
-func (f *fileManager) batch(in <-chan BackerEvent, out chan<- BackerEvent) {
+func (f *FileManager) batch(in <-chan BackerEvent, out chan<- BackerEvent) {
 	logger.Println("Starting batch process")
 	for event := range in {
 		f.backlog.Add(event)
@@ -130,7 +140,7 @@ func (f *fileManager) batch(in <-chan BackerEvent, out chan<- BackerEvent) {
 	}
 }
 
-func (f *fileManager) handleFile(in <-chan BackerEvent) {
+func (f *FileManager) handleFile(in <-chan BackerEvent) {
 	for event := range in {
 		if event.Type == REMOVE {
 			logger.Printf("Removing %s from %s\n", event.Path, f.watcherRoots[event.Path])

@@ -13,11 +13,13 @@ func (e *pathError) Error() string {
 	return "Resource: " + e.location + " does not exist"
 }
 
+// Watcher - Configuration struct for watching a specific file path
 type Watcher struct {
 	BucketPath string `json:"bucketPath"`
 	Path       string `json:"path"`
 }
 
+// GetPath - Returns the absolute Path of the Watcher
 func (w *Watcher) GetPath() string {
 	path, err := filepath.Abs(w.Path)
 	if err != nil {
