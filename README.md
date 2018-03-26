@@ -1,3 +1,6 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://travis-ci.org/nickrobison/backer.svg?branch=master)](https://travis-ci.org/nickrobison/backer)
+[ ![Download](https://api.bintray.com/packages/nickrobison/debian/backer/images/download.svg) ](https://bintray.com/nickrobison/debian/backer/_latestVersion)
 # Backer
 
 Simple utility for keeping those various config files and settings that you have scattered across your servers, backed up to remote storage.
