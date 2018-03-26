@@ -28,3 +28,7 @@ _testmain.go
 
 #VSCode directory
 .vscode/
+
+#Any config files in the directory
+config.json
+test/
