@@ -1,16 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"net/rpc"
+	"os"
 
 	"github.com/nickrobison/backer/shared"
+	"github.com/olekukonko/tablewriter"
 	"gopkg.in/urfave/cli.v1"
 )
 
 func listWatchers(c *cli.Context) error {
 	logger.Println("Listing watchers")
-	logger.Println("Calling RPC server")
 	client, err := rpc.Dial("unix", "/tmp/backer.sock")
 	if err != nil {
 		logger.Fatalln(err)
@@ -22,13 +22,14 @@ func listWatchers(c *cli.Context) error {
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	logger.Println("Has response", reply)
 
-	fmt.Println("Currently watching:")
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Path", "Status"})
+
 	for _, watcher := range reply.Paths {
-		fmt.Println(watcher)
+		table.Append([]string{watcher, "OK"})
 	}
-	// rpcClient.SayHello()
+	table.Render()
 	return nil
 }
 
