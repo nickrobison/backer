@@ -40,7 +40,7 @@ release: clean
 	docker run --rm -it -v "${PWD}:${DOCKER_WDIR}" -w ${DOCKER_WDIR} --entrypoint fpm alanfranz/fpm-within-docker:debian-jessie ${DEB_OPTS} \
 	--iteration ${RELEASE} \
 	--architecture amd64 \
-	--deb-systemd go-backer.service \
+	--deb-systemd backer.service \
 	-C packaging/debian \
 	${FPM_OPTS} \
 	# Remove it
