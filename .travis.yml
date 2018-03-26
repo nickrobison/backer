@@ -1,26 +1,20 @@
 language: go
-
 os:
-  - linux
-  - osx
-
+- linux
+- osx
 go:
-  - '1.10.x'
-  - master
-
+- 1.10.x
+- master
 services:
-  - docker
-
+- docker
 script:
-  - make test
-
+- make test
 deploy:
   provider: script
   script: make release
   on:
     master: true
-    tags: true  
-    condition: $TRAVIS_GO_VERSION =~ ^1\.10(\.[0-9]+)?$ && $TRAVIS_OS_NAME = linux
-
+    tags: true
+    condition: "$TRAVIS_GO_VERSION =~ ^1\\.10(\\.[0-9]+)?$ && $TRAVIS_OS_NAME = linux"
 env:
-  secure: OhR91RCTQ3MHmxn86e95+s1rR7Ddxv8d4Bi2E13SynGpZawRuOTnnfZxYTD54GEYXRnLU/rKNlqKp+ovZEtjcjnahL4TX/jFYU/qkqGnrXWwnYhv75Im2pFnyVwLz5TtxNKZypXr9PRbmtSvvN9H5MKKoBFJnfz+y1Y/jllQiswNAHnmcWTnq0jqh9vB4CvEAzFPgT/BQhv0tVnupJfyd0sQ+db+SOsjjn8CmPlYVKdsB9OcZJiOAl1RkvfM/90hDV5KlvTbWbglqA7ahFpbr05yYLW4lpsASzmXq2TA7fq1IAkloolaXfT1bOWGl2KAyS/aWRzGa60XatmOQ/OIhZCrUf9EwhpBAReH9E8PdIme2VFVbP890VjYwZ2j65CtFWnEHKNFlV9qkSf5J+bgakfl2Hf1s96CGIA+JhkFkRUoptIhThKHyyCkaUieBVGsZV2uqExFs/IfKSB6b1aLoXbX17yy79w6CmukkTotycoVliPzqTrEKVpatK3VYPkPi6AqnbqnWlBchtF1SD5qU7gaRJRCUlrxtp2MbnoL4H/ifneVayg2ZX9VxCTtEjR4KFeTJgI1s/2dEyKfRuKItLomVtW/yYF9zyA1L4nz1qj+njns+zAVjsvUJEf2ChRvo3ehet8rJ+zFfBDQDocZHG61/cNmsy46QCVwS1ERnvA=
+  secure: mDWdz+CPsaTZRpGT88V4TH1tY2Sp6J4AJboCqN9sHm6S8FmfGv8efgfsbfa1ct4NO+8hkyXzNztFm+A0BML/q9xc06Q2zqGx4DW4GmmlcK/MCnnanyBuRFCbKqdMvpWFnFgp7muJnDKNHd4RXeTm8e1c3lFJmxmmKHPb0VI9i4f0fDu5IougHCJ8LUFx7gUa0P4OESWH1lF0ogG4cLQ9bfAgG5KvQ8xjv4jY3D4qVAU4rLB24s9/OpgHpuUMXyw3LD3qWfnstz7jbtnkMUmUm1CBKfNdxCHW5IKl28D2gM7uVvPn3kid2eqapN3Qthsbz33yDuoyYp4HxAuXMVf8O9SxqlsRfy+g51YNdyTx6OgZaWGUFi3r9lrwpS4ZP19dtyy8R/r8mDANJUO+zqIpriYYRsZHBKwfz1EXERn24fjybfyo/tqmEUw5FVJj0SINx2nja6YXFAbB95ASOoG1vHDg6t02hHcUn4ZSlSb8Z3ZPBRXIY14zL1JT5ZZwTYOE9/RiFjpM0dYNsCCttutGsbQPivSBt0tQJ/plWarWKtsoVVrpMQGEwamsBqdbT4vJtOQaeivdIM6Q4Oo8ydheGC03OKuxhvGjCHDqK7vlcUYdbfGrCA+dXSHGmOiJlKvRbEm5LATb/6nbxcpoN/bDnGPzlFLAjNcLzw5kRo8a9LU=
