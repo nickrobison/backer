@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,11 +16,16 @@ import (
 
 func TestUpload(t *testing.T) {
 
-	testBytes := []byte("Test byte upload")
+	testString := "Test byte upload"
+
+	testBytes := []byte(testString)
 
 	testByteReader := bytes.NewReader(testBytes)
 
+	var checksumChan = make(chan string, 1)
+
 	hash := generateSHA256Hash(bytes.NewReader(testBytes))
+	checksumChan <- hash
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
@@ -28,8 +34,13 @@ func TestUpload(t *testing.T) {
 			t.Error(err)
 		}
 		// Ensure the file is equal
-		if bytes.Equal(bodyBytes, testBytes) {
+		if !bytes.Equal(bodyBytes, testBytes) {
 			t.Errorf("Bytes should be equal")
+		}
+
+		// Read it back to a string
+		if testString != fmt.Sprintf("%s", bodyBytes) {
+			t.Errorf("Strings don't match!")
 		}
 
 		// Check that the shas match
@@ -52,7 +63,7 @@ func TestUpload(t *testing.T) {
 		},
 	}
 
-	uploader.UploadFile("test-file", testByteReader, "test-remote")
+	uploader.UploadFile("test-file", testByteReader, "test-remote", checksumChan)
 }
 
 func createTestSetup(handler http.HandlerFunc) *session.Session {

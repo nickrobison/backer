@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"os"
 	"sync"
@@ -13,7 +15,7 @@ const chmodMask fsnotify.Op = ^fsnotify.Op(0) ^ fsnotify.Chmod
 
 // Uploader - Primary interface to be implemented by the various backends
 type Uploader interface {
-	UploadFile(name string, data io.Reader, remotePath string)
+	UploadFile(name string, data io.Reader, remotePath string, checksumChannel chan string)
 	DeleteFile(name string, remotePath string)
 }
 
@@ -162,7 +164,8 @@ func (f *FileManager) handleFile(in <-chan BackerEvent) {
 			defer file.Close()
 
 			uploaderRef := f.uploaders
-			var pipeWriters = make([]io.Writer, len(*uploaderRef))
+			var pipeWriters = make([]io.Writer, len(*uploaderRef)+1)
+			var checksumChannels = make([]chan string, len(*uploaderRef))
 
 			watcherPath := f.watcherRoots[event.Path]
 
@@ -172,34 +175,60 @@ func (f *FileManager) handleFile(in <-chan BackerEvent) {
 				reader, writer := io.Pipe()
 				pipeWriters[idx] = writer
 
+				// Make a checksum channel
+				var checksumChan = make(chan string, 1)
+				checksumChannels[idx] = checksumChan
+
 				go func(u Uploader, event *BackerEvent) {
 					defer wg.Done()
-					u.UploadFile(event.Path, reader, watcherPath)
+					u.UploadFile(event.Path, reader, watcherPath, checksumChan)
 				}(uploader, &event)
 			}
 
+			// Do the checksumming
+			go func() {
+
+				// checksum := generateSHA256Hash(chksumReader)
+				logger.Printf("Finished checksumming %s\n", event.Path)
+				for _, channel := range checksumChannels {
+					channel <- "data"
+				}
+			}()
+
 			// Run this in a go routine, so that way when it returns, we close all the writers, otherwise they'll deadlock and never stop reading
 			go func() {
-				// Close all the writers
+				// Defer closing all the writers, except the Hash
 				for _, writer := range pipeWriters {
 					// Cast this back to a PipeWriter, seems gross
-					defer writer.(*io.PipeWriter).Close()
+					w, ok := writer.(*io.PipeWriter)
+					if ok {
+						defer w.Close()
+					}
 				}
+
+				// Create a new Hash function to checksum the file
+				hash := sha256.New()
+				pipeWriters[len(pipeWriters)-1] = hash
 				// Create a multiwriter and read everything into it
 				mw := io.MultiWriter(pipeWriters...)
+				logger.Println("Reading from file")
 				io.Copy(mw, file)
+				logger.Println("Finished reading to pipes")
+
+				// Get the hash value and send it along to the backends
+				hashString := hex.EncodeToString(hash.Sum(nil))
+				logger.Println(hashString)
+				for _, channel := range checksumChannels {
+					channel <- hashString
+				}
 			}()
 			wg.Wait()
+			logger.Printf("Wait done, closing %d channels", len(checksumChannels))
+			for idx, channel := range checksumChannels {
+				logger.Printf("Closing channel %d\n", idx)
+				close(channel)
+			}
 		}
+		logger.Printf("Finished uploading %s\n", event.Path)
 	}
-}
-
-func closeWriter(writer *io.PipeWriter) {
-	logger.Println("Closing Writer")
-	writer.Close()
-}
-
-func closeReader(reader *io.PipeReader) {
-	logger.Println("Closing Readiner")
-	reader.Close()
 }
