@@ -1,0 +1,23 @@
+{
+    "deleteOnRemove": true,
+    "deleteOnShutdown": true,
+    "watchers": [
+        {
+            "bucketPath": "",
+            "path": ""
+        }
+    ],
+    "s3": {
+        "versioning": true,
+        "reducedRedundancy": true,
+        "region": "us-west-2",
+        "bucket": "",
+        "bucketRoot": "",
+        "credentials": {
+            "AccessKeyID": "",
+            "SecretAccessKey": "",
+            "SessionToken": "",
+            "ProviderName": ""
+        }
+    }
+}
