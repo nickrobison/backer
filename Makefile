@@ -21,7 +21,7 @@ FPM_OPTS :=-s dir -v $(VERSION) -n $(PKGNAME) \
 DEB_OPTS := -t deb --deb-user $(USER) --after-install packaging/debian/backer.postinst
 
 test:
-	go test -v ./...
+	go test -race -v ./...
 
 build:
 	go build -o 'bin/backer' .
