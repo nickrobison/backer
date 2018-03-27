@@ -2,7 +2,10 @@ package daemon
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -24,8 +27,13 @@ func TestUpload(t *testing.T) {
 
 	var checksumChan = make(chan string, 1)
 
-	hash := generateSHA256Hash(bytes.NewReader(testBytes))
-	checksumChan <- hash
+	hash := sha256.New()
+
+	io.Copy(hash, bytes.NewReader(testBytes))
+	hashString := hex.EncodeToString(hash.Sum(nil))
+
+	// hash := generateSHA256Hash(bytes.NewReader(testBytes))
+	checksumChan <- hashString
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
@@ -45,7 +53,7 @@ func TestUpload(t *testing.T) {
 
 		// Check that the shas match
 		checksum := r.Header.Get("X-Amz-Meta-Checksum")
-		if hash != checksum {
+		if hashString != checksum {
 			t.Errorf("Checksums should match")
 		}
 
