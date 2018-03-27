@@ -4,10 +4,6 @@ platform:
     - x86
     - x64
 
-os:
-    - Windows Server 2012 R2
-    - Windows Server 2016
-
 branches:
     only:
       - master
