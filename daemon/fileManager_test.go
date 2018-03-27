@@ -3,6 +3,7 @@ package daemon
 import (
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,9 +37,7 @@ func TestFileCreation(t *testing.T) {
 		err = watcher.Add(newWatcher.GetPath())
 		assert.Nil(t, err, "Should be able to register watchers")
 	}
-
 	go fm.Start(watcher.Events, watcher.Errors)
-
 	tmpf := filepath.Join(dir, "tempFile")
 	// Try to create a new file
 	err = ioutil.WriteFile(tmpf, []byte(""), 0666)
@@ -122,7 +121,9 @@ type MockBackend struct {
 }
 
 func (b *MockBackend) UploadFile(name string, data io.Reader, remotePath string, checksumChannel chan string) {
-	b.checksum = <-checksumChannel
+	log.Println("Waiting for checksum")
+	<-checksumChannel
+	log.Println("Has checksum")
 	bytes, err := ioutil.ReadAll(data)
 	if err != nil {
 		panic(err)
