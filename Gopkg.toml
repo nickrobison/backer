@@ -48,3 +48,7 @@
 [[constraint]]
   name = "github.com/coreos/go-systemd"
   version = "16.0.0"
+
+[[constraint]]
+  name = "github.com/Microsoft/go-winio"
+  version = "0.4.7"

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"net/rpc"
 	"os"
 	"os/signal"
 	"syscall"
@@ -74,7 +75,20 @@ func Start(configLocation string) {
 	fm.Start(watcher.Events, watcher.Errors)
 
 	// Start listener
-	go startSocket(&config)
+	l, err := getSocket()
+	if err != nil {
+		logger.Fatalln(err)
+	}
+	defer l.Close()
+
+	cliRPC := &RPC{
+		Config: &config,
+	}
+	server := rpc.NewServer()
+	server.RegisterName("RPC", cliRPC)
+	go server.Accept(l)
+
+	// go startSocket(&config)
 	logger.Println("Ready to listen")
 
 	// Signal ready to systemd

@@ -1,8 +1,9 @@
+// +build !windows
+
 package daemon
 
 import (
 	"net"
-	"net/rpc"
 	"os"
 )
 
@@ -18,22 +19,47 @@ const unixSocket = "/tmp/backer.sock"
 //     logger.Println(string(buf))
 // }
 
-func startSocket(c *backerConfig) {
-	logger.Println("Listening on unix socket:", unixSocket)
-	l, err := net.Listen("unix", unixSocket)
-	if err != nil {
-		logger.Fatalln(err)
+func getSocket() (net.Listener, error) {
+
+	if fileExists(unixSocket) {
+		logger.Printf("File: %s already, exists, application may have crashed.\n", unixSocket)
+		err := os.Remove(unixSocket)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	cliRPC := &RPC{
-		Config: c,
+	l, err := net.Listen("unix", unixSocket)
+	if err != nil {
+		return nil, err
 	}
-	server := rpc.NewServer()
-	server.RegisterName("RPC", cliRPC)
-	server.Accept(l)
+	return l, nil
 }
+
+// func startSocket(c *backerConfig) {
+// 	logger.Println("Listening on unix socket:", unixSocket)
+// 	l, err := net.Listen("unix", unixSocket)
+// 	if err != nil {
+// 		logger.Fatalln(err)
+// 	}
+
+// 	cliRPC := &RPC{
+// 		Config: c,
+// 	}
+// 	server := rpc.NewServer()
+// 	server.RegisterName("RPC", cliRPC)
+// 	server.Accept(l)
+// }
 
 func removeSocket() {
 	logger.Println("Removing socket:", unixSocket)
 	os.Remove(unixSocket)
+}
+
+func fileExists(file string) bool {
+	_, err := os.Stat(file)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil
 }
