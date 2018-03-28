@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nickrobison/backer/backends"
+	"github.com/nickrobison/backer/shared"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/fsnotify/fsnotify"
@@ -33,8 +35,12 @@ func TestFileCreation(t *testing.T) {
 
 	// Register the watchers
 	for _, newWatcher := range fm.config.Watchers {
-		fm.RegisterWatcherPath(newWatcher.GetPath(), newWatcher.BucketPath)
-		err = watcher.Add(newWatcher.GetPath())
+		path, err := newWatcher.GetPath()
+		if err != nil {
+			logger.Fatalln(err)
+		}
+		fm.RegisterWatcherPath(path, newWatcher.BucketPath)
+		err = watcher.Add(path)
 		assert.Nil(t, err, "Should be able to register watchers")
 	}
 	go fm.Start(watcher.Events, watcher.Errors)
@@ -75,7 +81,7 @@ func TestFileCreation(t *testing.T) {
 	assert.Equal(t, tmpf2, mb.deletedFile, "Should delete 2nd temp file")
 }
 
-func createFileManager(backend Uploader) (*FileManager, string) {
+func createFileManager(backend backends.Uploader) (*FileManager, string) {
 
 	// Create a folder to watch
 	wd, err := os.Getwd()
@@ -89,14 +95,14 @@ func createFileManager(backend Uploader) (*FileManager, string) {
 	}
 
 	// Create the watchers
-	var watchers = []Watcher{Watcher{
+	var watchers = []shared.Watcher{shared.Watcher{
 		BucketPath: "test-bucket",
 		Path:       dir,
 	}}
 
-	var backends = []Uploader{backend}
+	var backends = []backends.Uploader{backend}
 
-	var mockConfig = &backerConfig{
+	var mockConfig = &shared.BackerConfig{
 		DeleteOnRemove: true,
 		Backends:       backends,
 		Watchers:       watchers,

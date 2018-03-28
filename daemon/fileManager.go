@@ -10,15 +10,11 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/nickrobison/backer/backends"
+	"github.com/nickrobison/backer/shared"
 )
 
 const chmodMask fsnotify.Op = ^fsnotify.Op(0) ^ fsnotify.Chmod
-
-// Uploader - Primary interface to be implemented by the various backends
-type Uploader interface {
-	UploadFile(name string, data io.Reader, remotePath string, checksumChannel chan string)
-	DeleteFile(name string, remotePath string)
-}
 
 // Event - Event type from FSNotify
 type Event int
@@ -48,14 +44,14 @@ func (b *BackerEvent) equals(other BackerEvent) bool {
 
 // FileManager - Manages the interaction between FSNotify events and the various data backends
 type FileManager struct {
-	config       *backerConfig
+	config       *shared.BackerConfig
 	backlog      Backlog
-	uploaders    *[]Uploader
+	uploaders    *[]backends.Uploader
 	watcherRoots map[string]string
 }
 
 // NewFileManager - Helper function for creating a new FileManager
-func NewFileManager(config *backerConfig) *FileManager {
+func NewFileManager(config *shared.BackerConfig) *FileManager {
 	return &FileManager{
 		config:       config,
 		backlog:      NewMultiFileBacklog(),
@@ -83,7 +79,7 @@ func (f *FileManager) RegisterWatcherPath(path string, remoteRoot string) {
 	f.watcherRoots[path] = remoteRoot
 }
 
-func (f *FileManager) handleFileEvents(config *backerConfig, eventChannel <-chan fsnotify.Event, errorChannel <-chan error, outputChannel chan<- BackerEvent) {
+func (f *FileManager) handleFileEvents(config *shared.BackerConfig, eventChannel <-chan fsnotify.Event, errorChannel <-chan error, outputChannel chan<- BackerEvent) {
 	logger.Println("Launching new file handler")
 	for {
 		select {
@@ -179,7 +175,7 @@ func (f *FileManager) handleFileUpload(event *BackerEvent) {
 		var checksumChan = make(chan string, 2)
 		checksumChannels[idx] = checksumChan
 
-		go func(u Uploader, event *BackerEvent) {
+		go func(u backends.Uploader, event *BackerEvent) {
 			defer wg.Done()
 			u.UploadFile(event.Path, reader, watcherPath, checksumChan)
 		}(uploader, event)

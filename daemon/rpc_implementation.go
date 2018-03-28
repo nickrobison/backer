@@ -4,7 +4,7 @@ import "github.com/nickrobison/backer/shared"
 
 // RPC - RPC interface
 type RPC struct {
-	Config *backerConfig
+	Config *shared.BackerConfig
 }
 
 // SayHello - Dummy Function (to remove)
@@ -19,7 +19,11 @@ func (r *RPC) ListWatchers(args int, watchers *shared.FileWatchers) error {
 	var watcherPaths = make([]string, len(r.Config.Watchers))
 
 	for i, watcher := range r.Config.Watchers {
-		watcherPaths[i] = watcher.GetPath()
+		path, err := watcher.GetPath()
+		if err != nil {
+			return err
+		}
+		watcherPaths[i] = path
 	}
 
 	logger.Println("Returning watcher paths")

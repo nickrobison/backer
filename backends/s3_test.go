@@ -1,4 +1,4 @@
-package daemon
+package backends
 
 import (
 	"bytes"
@@ -65,7 +65,7 @@ func TestUpload(t *testing.T) {
 	uploader := &S3Uploader{
 		session: session,
 		client:  s3.New(session),
-		config: &s3Options{
+		config: &S3Options{
 			Versioning:        true,
 			ReducedRedundancy: true,
 		},

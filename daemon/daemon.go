@@ -12,6 +12,8 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/fsnotify/fsnotify"
+	"github.com/nickrobison/backer/backends"
+	"github.com/nickrobison/backer/shared"
 )
 
 var logger *log.Logger
@@ -31,14 +33,14 @@ func Start(configLocation string) {
 		logger.Fatalln("Cannot read config file:", configLocation)
 	}
 
-	var config backerConfig
+	var config shared.BackerConfig
 	err = json.Unmarshal(file, &config)
 	if err != nil {
 		logger.Fatalln(err)
 	}
 
 	// Validate the paths
-	err = config.validateWatcherPaths()
+	err = config.ValidateWatcherPaths()
 	if err != nil {
 		logger.Fatalln(err)
 	}
@@ -55,9 +57,9 @@ func Start(configLocation string) {
 	defer watcher.Close()
 
 	// Create new uploader
-	var clients []Uploader
+	var clients []backends.Uploader
 
-	s3Client := NewS3Uploader(&config.S3)
+	s3Client := backends.NewS3Uploader(&config.S3)
 	clients = append(clients, s3Client)
 	config.Backends = clients
 
@@ -66,8 +68,12 @@ func Start(configLocation string) {
 
 	// Register all watchers
 	for _, newWatcher := range config.Watchers {
-		fm.RegisterWatcherPath(newWatcher.GetPath(), newWatcher.BucketPath)
-		err = watcher.Add(newWatcher.GetPath())
+		path, err := newWatcher.GetPath()
+		if err != nil {
+			logger.Fatalln(err)
+		}
+		fm.RegisterWatcherPath(path, newWatcher.BucketPath)
+		err = watcher.Add(path)
 		if err != nil {
 			logger.Fatalln(err)
 		}
