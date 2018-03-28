@@ -11,6 +11,9 @@ import (
 var logger *log.Logger
 var rpcClient *RPC
 
+// Application version
+var Version string
+
 func init() {
 	logger = log.New(os.Stdout, "backer:", log.Lshortfile)
 }
@@ -19,7 +22,7 @@ func main() {
 
 	app := cli.NewApp()
 
-	app.Version = "0.0.1"
+	app.Version = Version
 
 	// Flags
 	app.Flags = buildFlags()

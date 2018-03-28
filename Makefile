@@ -1,4 +1,4 @@
-VERSION := 0.0.1
+VERSION := $(shell cat VERSION)
 PKGNAME := backer
 LICENSE := MIT
 URL := http://github.com/nickrobison/backer
@@ -9,6 +9,7 @@ MAINTAINER := Nick Robison <nick@nickrobison.com>
 DOCKER_WDIR := /tmp/fpm
 DOCKER_FPM := fpm-ubuntu
 PLATFORMS := linux/amd64 linux/arm linux/arm64
+LD_FLAGS := "-X main.Version=$(VERSION)"
 
 FPM_OPTS :=-s dir -v $(VERSION) -n $(PKGNAME) \
   --license "$(LICENSE)" \
@@ -24,7 +25,7 @@ test:
 	go test -race -v ./...
 
 build:
-	go build -o 'bin/backer' .
+	go build -ldflags $(LD_FLAGS) -o 'bin/backer' .
 
 clean:
 	-rm -rf bin/
@@ -35,7 +36,7 @@ clean:
 release: clean
 	docker pull alanfranz/fpm-within-docker:debian-jessie
 	# Build
-	GOOS=linux GOARCH=amd64 go build -o packaging/debian/usr/bin/backer .
+	GOOS=linux GOARCH=amd64 go build -ldflags $(LD_FLAGS) -o packaging/debian/usr/bin/backer .
 	# Package
 	docker run --rm -it -v "${PWD}:${DOCKER_WDIR}" -w ${DOCKER_WDIR} --entrypoint fpm alanfranz/fpm-within-docker:debian-jessie ${DEB_OPTS} \
 	--iteration ${RELEASE} \
@@ -48,7 +49,7 @@ release: clean
 	# Upload it
 	./upload.sh ${VERSION} ${RELEASE} amd64
 	# Build
-	GOOS=linux GOARCH=arm go build -o packaging/debian/usr/bin/backer .
+	GOOS=linux GOARCH=arm go build -ldflags $(LD_FLAGS) -o packaging/debian/usr/bin/backer .
 	# Package
 	docker run --rm -it -v "${PWD}:${DOCKER_WDIR}" -w ${DOCKER_WDIR} --entrypoint fpm alanfranz/fpm-within-docker:debian-jessie ${DEB_OPTS} \
 	--iteration ${RELEASE} \

@@ -12,7 +12,7 @@ Restart=on-failure
 WatchdogSec=30s
 StartLimitIntervalSec=60
 
-ExecStart=/usr/bin/backer --config=/etc/backer/config.json
+ExecStart=/usr/bin/backer --config=/etc/backer/config.json --daemon
  
 [Install]
 WantedBy=multi-user.target`
