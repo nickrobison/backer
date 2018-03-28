@@ -191,7 +191,7 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 }
 
 // UploadFile to S3 Bucket
-func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string) {
+func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string, checksumChannel chan string) {
 	// Check if the file exists and if it matches what I need
 	// objectHead := s.getObjectDetails(s.buildObjectKey(name, remoteRoot))
 	// if objectHead != nil {
@@ -210,7 +210,10 @@ func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string) 
 	// 	checksumChannel <- generateSHA256Hash(data)
 	// }()
 
-	err := s.uploadObject(name, remoteRoot, data, generateSHA256Hash(data))
+	logger.Println("Waiting for checksum")
+	sum := <-checksumChannel
+	logger.Println("Checksummed")
+	err := s.uploadObject(name, remoteRoot, data, sum)
 	if err != nil {
 		logger.Println(err)
 	}

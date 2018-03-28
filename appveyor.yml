@@ -1,0 +1,25 @@
+version: "{build}"
+
+platform:
+    - x86
+    - x64
+
+branches:
+    only:
+      - master
+      - development
+
+clone_folder: c:\gopath\src\github.com\nickrobison\backer
+
+environment:
+    GOPATH: c:\gopath
+
+install:
+    - echo %PATH%
+    - echo %GOPATH%
+    - set PATH=%GOPATH%\bin;c:\bin;%PATH%
+    - go version
+    - go env
+
+build_script:
+    - go test -race -v .\...

@@ -2,6 +2,10 @@ package daemon
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,11 +19,21 @@ import (
 
 func TestUpload(t *testing.T) {
 
-	testBytes := []byte("Test byte upload")
+	testString := "Test byte upload"
+
+	testBytes := []byte(testString)
 
 	testByteReader := bytes.NewReader(testBytes)
 
-	hash := generateSHA256Hash(bytes.NewReader(testBytes))
+	var checksumChan = make(chan string, 1)
+
+	hash := sha256.New()
+
+	io.Copy(hash, bytes.NewReader(testBytes))
+	hashString := hex.EncodeToString(hash.Sum(nil))
+
+	// hash := generateSHA256Hash(bytes.NewReader(testBytes))
+	checksumChan <- hashString
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
@@ -28,13 +42,18 @@ func TestUpload(t *testing.T) {
 			t.Error(err)
 		}
 		// Ensure the file is equal
-		if bytes.Equal(bodyBytes, testBytes) {
+		if !bytes.Equal(bodyBytes, testBytes) {
 			t.Errorf("Bytes should be equal")
+		}
+
+		// Read it back to a string
+		if testString != fmt.Sprintf("%s", bodyBytes) {
+			t.Errorf("Strings don't match!")
 		}
 
 		// Check that the shas match
 		checksum := r.Header.Get("X-Amz-Meta-Checksum")
-		if hash != checksum {
+		if hashString != checksum {
 			t.Errorf("Checksums should match")
 		}
 
@@ -52,7 +71,7 @@ func TestUpload(t *testing.T) {
 		},
 	}
 
-	uploader.UploadFile("test-file", testByteReader, "test-remote")
+	uploader.UploadFile("test-file", testByteReader, "test-remote", checksumChan)
 }
 
 func createTestSetup(handler http.HandlerFunc) *session.Session {

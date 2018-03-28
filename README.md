@@ -1,5 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://travis-ci.org/nickrobison/backer.svg?branch=master)](https://travis-ci.org/nickrobison/backer)
+[![Appveyor Build status](https://ci.appveyor.com/api/projects/status/3o70eaw8lpkqqeg9/branch/master?svg=true)](https://ci.appveyor.com/project/nickrobison/backer/branch/master)
 [ ![Download](https://api.bintray.com/packages/nickrobison/debian/backer/images/download.svg) ](https://bintray.com/nickrobison/debian/backer/_latestVersion)
 # Backer
 
