@@ -58,6 +58,51 @@ func NewS3Uploader(options *S3Options) *S3Uploader {
 	return s3Uploader
 }
 
+// GetName - Specifies that this is an S3 backend
+func (s *S3Uploader) GetName() string {
+	return "S3"
+}
+
+// DeleteFile from S3 Bucket
+func (s *S3Uploader) DeleteFile(name string, remoteRoot string) {
+	if s.config.Versioning {
+		s.deleteVersionedObject(s.buildObjectKey(name, remoteRoot))
+	} else {
+		s.deleteObject(s.buildObjectKey(name, remoteRoot))
+	}
+}
+
+// UploadFile to S3 Bucket
+func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string, checksum string) {
+	// Check if the file exists and if it matches what I need
+	// objectHead := s.getObjectDetails(s.buildObjectKey(name, remoteRoot))
+	// if objectHead != nil {
+	// 	log.Println("Object exists")
+	// 	log.Println(objectHead.Metadata)
+	// }
+
+	// file, err := os.Open(name)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// defer file.Close()
+
+	// checksumChannel := make(chan string)
+	// go func() {
+	// 	checksumChannel <- generateSHA256Hash(data)
+	// }()
+	err := s.uploadObject(name, remoteRoot, data, checksum)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+// FileInSync - Check that S3 has the latest version of the file, and upload if not
+func (s *S3Uploader) FileInSync(name string, remotePath string, data io.Reader, checksum string) (string, error) {
+	// <-checksumChan
+	return "", nil
+}
+
 func (s *S3Uploader) createBucket() {
 	log.Println("Creating bucket:", s.config.Bucket)
 	_, err := s.client.CreateBucket(&s3.CreateBucketInput{
@@ -206,44 +251,6 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 		if err != nil {
 			log.Println(err)
 		}
-	}
-}
-
-// UploadFile to S3 Bucket
-func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string, checksumChannel chan string) {
-	// Check if the file exists and if it matches what I need
-	// objectHead := s.getObjectDetails(s.buildObjectKey(name, remoteRoot))
-	// if objectHead != nil {
-	// 	log.Println("Object exists")
-	// 	log.Println(objectHead.Metadata)
-	// }
-
-	// file, err := os.Open(name)
-	// if err != nil {
-	// 	log.Println(err)
-	// }
-	// defer file.Close()
-
-	// checksumChannel := make(chan string)
-	// go func() {
-	// 	checksumChannel <- generateSHA256Hash(data)
-	// }()
-
-	log.Println("Waiting for checksum")
-	sum := <-checksumChannel
-	log.Println("Checksummed")
-	err := s.uploadObject(name, remoteRoot, data, sum)
-	if err != nil {
-		log.Println(err)
-	}
-}
-
-// DeleteFile from S3 Bucket
-func (s *S3Uploader) DeleteFile(name string, remoteRoot string) {
-	if s.config.Versioning {
-		s.deleteVersionedObject(s.buildObjectKey(name, remoteRoot))
-	} else {
-		s.deleteObject(s.buildObjectKey(name, remoteRoot))
 	}
 }
 

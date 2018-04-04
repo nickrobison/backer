@@ -71,7 +71,7 @@ func TestUpload(t *testing.T) {
 		},
 	}
 
-	uploader.UploadFile("test-file", testByteReader, "test-remote", checksumChan)
+	uploader.UploadFile("test-file", testByteReader, "test-remote", <-checksumChan)
 }
 
 func createTestSetup(handler http.HandlerFunc) *session.Session {
