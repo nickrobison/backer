@@ -5,10 +5,11 @@ import (
 	"encoding/hex"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/nickrobison/backer/backends"
 	"github.com/nickrobison/backer/shared"
@@ -39,7 +40,7 @@ func TestFileCreation(t *testing.T) {
 	for _, newWatcher := range fm.config.Watchers {
 		path, err := newWatcher.GetPath()
 		if err != nil {
-			logger.Fatalln(err)
+			log.Fatalln(err)
 		}
 		fm.RegisterWatcherPath(path, newWatcher.BucketPath)
 		err = watcher.Add(path)
@@ -114,7 +115,7 @@ func TestDirectorySync(t *testing.T) {
 	for _, newWatcher := range fm.config.Watchers {
 		path, err := newWatcher.GetPath()
 		if err != nil {
-			logger.Fatalln(err)
+			log.Fatalln(err)
 		}
 		fm.RegisterWatcherPath(path, newWatcher.BucketPath)
 		err = watcher.Add(path)

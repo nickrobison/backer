@@ -1,5 +1,7 @@
 package daemon
 
+import log "github.com/sirupsen/logrus"
+
 // Borrowed heavily from: github.com/cespare/reflex
 
 // Backlog - struct for maintaining a list of events to process
@@ -43,7 +45,7 @@ func (b *MultiFileBacklog) Add(event BackerEvent) {
 // Next - retrieves the next BackerEvent from the Backlog
 func (b *MultiFileBacklog) Next() BackerEvent {
 	if b.empty {
-		logger.Fatalln("Empty backlog, can't get next")
+		log.Fatalln("Empty backlog, can't get next")
 	}
 	return b.next
 }
@@ -51,7 +53,7 @@ func (b *MultiFileBacklog) Next() BackerEvent {
 // RemoveOne - Removes a single BackerEvent from the Backlog
 func (b *MultiFileBacklog) RemoveOne() bool {
 	if b.empty {
-		logger.Fatalln("Empty backlog, can't remove")
+		log.Fatalln("Empty backlog, can't remove")
 	}
 	if len(b.rest) == 0 {
 		b.next = BackerEvent{}

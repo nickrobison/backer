@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/Microsoft/go-winio"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const windowsPipe string = `\\.\pipe\backer`
@@ -20,6 +22,6 @@ func getSocket() (net.Listener, error) {
 }
 
 func removeSocket() {
-	logger.Println("Removing socket:", windowsPipe)
+	log.Debugln("Removing socket:", windowsPipe)
 	os.Remove(windowsPipe)
 }

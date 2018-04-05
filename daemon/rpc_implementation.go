@@ -1,6 +1,9 @@
 package daemon
 
-import "github.com/nickrobison/backer/shared"
+import (
+	"github.com/nickrobison/backer/shared"
+	log "github.com/sirupsen/logrus"
+)
 
 // RPC - RPC interface
 type RPC struct {
@@ -9,7 +12,7 @@ type RPC struct {
 
 // SayHello - Dummy Function (to remove)
 func (r *RPC) SayHello(args int, reply *string) error {
-	logger.Println("In rpc call")
+	log.Println("In rpc call")
 	*reply = "Hello there!"
 	return nil
 }
@@ -26,7 +29,7 @@ func (r *RPC) ListWatchers(args int, watchers *shared.FileWatchers) error {
 		watcherPaths[i] = path
 	}
 
-	logger.Println("Returning watcher paths")
+	log.Debugln("Returning watcher paths")
 
 	watchers.Paths = watcherPaths
 	return nil

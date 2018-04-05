@@ -3,12 +3,13 @@ package daemon
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/rpc"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/fsnotify/fsnotify"
@@ -16,33 +17,33 @@ import (
 	"github.com/nickrobison/backer/shared"
 )
 
-var logger *log.Logger
+// var logger *log.Logger
 
-func init() {
-	logger = log.New(os.Stdout, "backer-daemon:", log.Lshortfile)
-}
+// func init() {
+// 	logger = log.New(os.Stdout, "backer-daemon:", log.Lshortfile)
+// }
 
 // Start backer daemon
 // Registers an S3 uploader and a fileManager to watch the watchers
 func Start(configLocation string) {
-	logger.Println("Starting up Backer daemon")
+	log.Println("Starting up Backer daemon")
 
 	// Read in the config file
 	file, err := ioutil.ReadFile(configLocation)
 	if err != nil {
-		logger.Fatalln("Cannot read config file:", configLocation)
+		log.Fatalln("Cannot read config file:", configLocation)
 	}
 
 	var config shared.BackerConfig
 	err = json.Unmarshal(file, &config)
 	if err != nil {
-		logger.Fatalln(err)
+		log.Fatalln(err)
 	}
 
 	// Validate the paths
 	err = config.ValidateWatcherPaths()
 	if err != nil {
-		logger.Fatalln(err)
+		log.Fatalln(err)
 	}
 
 	// Register the shutdown handler
@@ -52,7 +53,7 @@ func Start(configLocation string) {
 	// Create a new watcher
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		logger.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer watcher.Close()
 
@@ -70,12 +71,12 @@ func Start(configLocation string) {
 	for _, newWatcher := range config.Watchers {
 		path, err := newWatcher.GetPath()
 		if err != nil {
-			logger.Fatalln(err)
+			log.Fatalln(err)
 		}
 		fm.RegisterWatcherPath(path, newWatcher.BucketPath)
 		err = watcher.Add(path)
 		if err != nil {
-			logger.Fatalln(err)
+			log.Fatalln(err)
 		}
 	}
 	fm.Start(watcher.Events, watcher.Errors)
@@ -83,7 +84,7 @@ func Start(configLocation string) {
 	// Start listener
 	l, err := getSocket()
 	if err != nil {
-		logger.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer l.Close()
 
@@ -95,7 +96,7 @@ func Start(configLocation string) {
 	go server.Accept(l)
 
 	// go startSocket(&config)
-	logger.Println("Ready to listen")
+	log.Debugln("Ready to listen")
 
 	// Signal ready to systemd
 	systemd.SdNotify(false, "READY=1")
@@ -120,7 +121,7 @@ func shutdown(done chan bool) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
-	logger.Println("Shutting down")
+	log.Println("Shutting down")
 	removeSocket()
 	// Cleanup code
 	done <- true
