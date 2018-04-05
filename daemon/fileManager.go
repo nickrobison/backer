@@ -114,11 +114,11 @@ func (f *FileManager) syncFiles(root string, remotePath string) {
 						wg.Done()
 					}()
 					// checksum := <-checksumChan
-					oldChecksum, err := backend.FileInSync(file, remotePath, br, checksum)
+					fileInSync, err := backend.FileInSync(file, remotePath, br, checksum)
 					if err != nil {
 						logger.Fatalln(err)
 					}
-					if oldChecksum != "hello" {
+					if !fileInSync {
 						logger.Printf("Updated file %s on backend %s\n", file, backend.GetName())
 					}
 				}(file, remotePath, backend)

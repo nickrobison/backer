@@ -13,6 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
+// This needs to be capitalized
+const checksumKey = "Checksum"
+
 // S3Uploader struct which contains configuration settings for managing S3 Buckets
 type S3Uploader struct {
 	session *session.Session
@@ -97,10 +100,32 @@ func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string, 
 	}
 }
 
-// FileInSync - Check that S3 has the latest version of the file, and upload if not
-func (s *S3Uploader) FileInSync(name string, remotePath string, data io.Reader, checksum string) (string, error) {
-	// <-checksumChan
-	return "", nil
+// FileInSync - Check that S3 has the latest version of the file, and upload if not. Returns whether or not the file is in sync
+func (s *S3Uploader) FileInSync(name string, remotePath string, data io.Reader, checksum string) (bool, error) {
+
+	objectKey := s.buildObjectKey(name, remotePath)
+	head, err := s.client.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(s.config.Bucket),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		if requestErr, ok := err.(s3.RequestFailure); ok {
+			// If the code is 404, that's fine, continue
+			if requestErr.StatusCode() == 404 {
+				s.UploadFile(name, data, remotePath, checksum)
+				return false, nil
+			}
+			return false, err
+		}
+		return false, err
+	}
+	oldChecksum := head.Metadata[checksumKey]
+	// Upload the file
+	if *oldChecksum != checksum {
+		s.UploadFile(name, data, remotePath, checksum)
+		return false, nil
+	}
+	return true, nil
 }
 
 func (s *S3Uploader) createBucket() {
@@ -113,7 +138,7 @@ func (s *S3Uploader) createBucket() {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
 			case "BucketAlreadyExists":
-				log.Panicf("Bucket %s already exists in the S3 system\nBuckets must have unique names.", s.config.Bucket)
+				log.Fatalf("Bucket %s already exists in the S3 system\nBuckets must have unique names.", s.config.Bucket)
 			case "BucketAlreadyOwnedByYou":
 				log.Printf("Bucket %s already exists", s.config.Bucket)
 			default:
@@ -149,7 +174,7 @@ func (s *S3Uploader) uploadObject(name string, remoteRoot string, object io.Read
 	// Setup the metadata
 	log.Println("Metadata:", checksum)
 	metadata := make(map[string]*string)
-	metadata["checksum"] = aws.String(checksum)
+	metadata[checksumKey] = aws.String(checksum)
 
 	// Set the redundency
 	var storage string

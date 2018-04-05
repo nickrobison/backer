@@ -224,14 +224,14 @@ func (b *MockBackend) GetName() string {
 	return "MockBackend"
 }
 
-func (b *MockBackend) FileInSync(name string, remotePath string, data io.Reader, checksum string) (string, error) {
+func (b *MockBackend) FileInSync(name string, remotePath string, data io.Reader, checksum string) (bool, error) {
 	bytes, err := ioutil.ReadAll(data)
 	if err != nil {
 		panic(err)
 	}
 	log.Printf("Mock backend: %s\n", string(bytes))
 	b.synchronizedFiles[name] = checksum
-	return "", nil
+	return true, nil
 }
 
 func hashData(t *testing.T, data []byte) string {
