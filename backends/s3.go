@@ -2,8 +2,9 @@ package backends
 
 import (
 	"io"
-	"log"
 	"path"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -172,7 +173,7 @@ func (s *S3Uploader) createBucket() {
 
 func (s *S3Uploader) uploadObject(name string, remoteRoot string, object io.Reader, checksum string) error {
 	// Setup the metadata
-	log.Println("Metadata:", checksum)
+	log.Debugln("Metadata:", checksum)
 	metadata := make(map[string]*string)
 	metadata[checksumKey] = aws.String(checksum)
 
@@ -197,7 +198,7 @@ func (s *S3Uploader) uploadObject(name string, remoteRoot string, object io.Read
 	if err != nil {
 		return err
 	}
-	log.Printf("Uploaded %s to %s", name, result.Location)
+	log.Debugf("Uploaded %s to %s\n", name, result.Location)
 	return nil
 }
 
@@ -212,7 +213,7 @@ func (s *S3Uploader) getObjectDetails(key string) *s3.HeadObjectOutput {
 			case "NoSuchKey":
 				return nil
 			default:
-				log.Panicln(awsErr)
+				log.Fatalln(awsErr)
 			}
 		}
 	}
@@ -226,7 +227,7 @@ func (s *S3Uploader) deleteObject(key string) {
 	})
 
 	if err != nil {
-		log.Println(err)
+		log.Errorln(err)
 	}
 }
 
@@ -243,9 +244,8 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 			VersionIdMarker: nextVersion,
 		})
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 		}
-		log.Println(resp)
 		for _, version := range resp.Versions {
 			if *version.Key == key {
 				versions = append(versions, version.VersionId)
@@ -263,7 +263,7 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 			VersionId: version,
 		})
 	}
-	log.Println(deleteObjects)
+	log.Debugln(deleteObjects)
 	if len(deleteObjects) > 0 {
 		deleteRequest := &s3.DeleteObjectsInput{
 			Bucket: aws.String(s.config.Bucket),
@@ -274,7 +274,7 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 		// Now, delete them
 		_, err := s.client.DeleteObjects(deleteRequest)
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 		}
 	}
 }

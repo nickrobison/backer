@@ -1,21 +1,26 @@
 package main
 
 import (
-	"log"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/nickrobison/backer/daemon"
 	"gopkg.in/urfave/cli.v1"
 )
 
-var logger *log.Logger
 var rpcClient *RPC
 
-// Application version
+// Version - Application version
 var Version string
 
 func init() {
-	logger = log.New(os.Stdout, "backer:", log.Lshortfile)
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.InfoLevel)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+	// logger = log.New(os.Stdout, "backer:", log.Lshortfile)
 }
 
 func main() {
@@ -37,13 +42,17 @@ func main() {
 func buildFlags() []cli.Flag {
 	return []cli.Flag{
 		cli.BoolFlag{
-			Name:  "daemon",
+			Name:  "daemon, d",
 			Usage: "Run the backer daemon",
 		},
 		cli.StringFlag{
 			Name:  "config, c",
 			Value: "./config.json",
 			Usage: "Load config from `FILE`",
+		},
+		cli.BoolFlag{
+			Name:  "debug",
+			Usage: "Enabled debug logging",
 		},
 	}
 }
@@ -80,23 +89,17 @@ func buildCommnds() []cli.Command {
 }
 
 func parseFlags(c *cli.Context) error {
+	// Enable debug log output
+	if c.Bool("debug") {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	// Start daemon
 	if c.Bool("daemon") {
-		logger.Println("Launching daemon")
+		log.Println("Launching daemon")
 		daemon.Start(c.String("config"))
 	} else {
 		rpcClient = &RPC{}
 	}
 	return nil
 }
-
-// func startRPC() {
-// 	logger.Panicln("Calling RPC server")
-// 	client, err := rpc.Dial("unix", "/tmp/backer.sock")
-// 	if err != nil {
-// 		logger.Fatalln(err)
-// 	}
-
-// 	rpcClient = &RPC{
-// 		client: client,
-// 	}
-// }
