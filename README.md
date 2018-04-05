@@ -36,8 +36,9 @@ Backer has a few configuration options that need to be set.
 If you installed the Debian package, the default config is located in `/etc/backer/config.json`.
 Otherwise, create a `config.json` file and point Backer to it.
 
-```json
+```js
 {
+    "syncOnStartup": true, // On startup, sync all the files in the watcher paths with the remote backends
     "deleteOnRemove": true, // When a file is removed from the system, delete its remote copy (Not implemented yet)
     "deleteOnShutdown": false, // Delete the remote files when a shutdown occurs (Not implemented yet)
     "watchers": [
@@ -97,5 +98,9 @@ Right now, you can only upload files, you can't delete them, and you can't downl
 - [ ] Multiple backends
     - [ ] SCP
     - [ ] FTP
+    - [ ] Glacier
+    - [ ] Azure
+    - [ ] Digital Ocean
+    - [ ] Backblaze
 - [ ] Full CLI support
-- [ ] Windows support
+- [x] Windows support
