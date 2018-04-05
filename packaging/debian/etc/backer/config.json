@@ -1,4 +1,5 @@
 {
+    "syncOnStartup": true,
     "deleteOnRemove": true,
     "deleteOnShutdown": true,
     "watchers": [

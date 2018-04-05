@@ -3,22 +3,19 @@ package daemon
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"hash"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/nickrobison/backer/backends"
+	"github.com/nickrobison/backer/shared"
 )
 
 const chmodMask fsnotify.Op = ^fsnotify.Op(0) ^ fsnotify.Chmod
-
-// Uploader - Primary interface to be implemented by the various backends
-type Uploader interface {
-	UploadFile(name string, data io.Reader, remotePath string, checksumChannel chan string)
-	DeleteFile(name string, remotePath string)
-}
 
 // Event - Event type from FSNotify
 type Event int
@@ -48,14 +45,14 @@ func (b *BackerEvent) equals(other BackerEvent) bool {
 
 // FileManager - Manages the interaction between FSNotify events and the various data backends
 type FileManager struct {
-	config       *backerConfig
+	config       *shared.BackerConfig
 	backlog      Backlog
-	uploaders    *[]Uploader
+	uploaders    *[]backends.Uploader
 	watcherRoots map[string]string
 }
 
 // NewFileManager - Helper function for creating a new FileManager
-func NewFileManager(config *backerConfig) *FileManager {
+func NewFileManager(config *shared.BackerConfig) *FileManager {
 	return &FileManager{
 		config:       config,
 		backlog:      NewMultiFileBacklog(),
@@ -64,8 +61,124 @@ func NewFileManager(config *backerConfig) *FileManager {
 	}
 }
 
+func (f *FileManager) syncFiles(root string, remotePath string) {
+	// If root is a directory, list all the files and check each one individually
+	var files []string
+	dir, err := isDir(root)
+	if err != nil {
+		logger.Fatalln(err)
+	}
+
+	// If we're a dir, get all the files in the directory
+	if dir {
+		fls, err := ioutil.ReadDir(root)
+		if err != nil {
+			logger.Fatalln(err)
+		}
+		files = make([]string, len(fls))
+		for idx, file := range fls {
+			files[idx] = filepath.Join(root, file.Name())
+		}
+	} else {
+		files = []string{root}
+	}
+
+	var filesWg sync.WaitGroup
+	filesWg.Add(len(files))
+
+	// For each file, check that the backends all have the latest copy, or send the new one along
+	for _, file := range files {
+		func(file string, filesWg *sync.WaitGroup) {
+			defer func() {
+				logger.Println("Doning filesWG")
+				filesWg.Done()
+			}()
+			var wg sync.WaitGroup
+			wg.Add(len(*f.uploaders))
+
+			// Create the writer and checksum array
+			writers := make([]io.Writer, len(*f.uploaders))
+
+			// Do the checksum
+			checksum, err := f.checksumFile(file)
+			if err != nil {
+				logger.Fatalln(err)
+			}
+
+			for idx, backend := range *f.uploaders {
+				br, bw := io.Pipe()
+				writers[idx] = bw
+				go func(file string, remotePath string, backend backends.Uploader) {
+					defer func() {
+						logger.Println("Closing backend")
+						wg.Done()
+					}()
+					// checksum := <-checksumChan
+					fileInSync, err := backend.FileInSync(file, remotePath, br, checksum)
+					if err != nil {
+						logger.Fatalln(err)
+					}
+					if !fileInSync {
+						logger.Printf("Updated file %s on backend %s\n", file, backend.GetName())
+					}
+				}(file, remotePath, backend)
+			}
+
+			// hashr, hashw := io.Pipe()
+
+			// hash := sha256.New()
+			// writers[len(writers)-1] = hashw
+
+			// go func() {
+
+			// 	hash := sha256.New()
+			// 	written, err := io.Copy(hash, hashr)
+			// 	if err != nil {
+			// 		logger.Println(err)
+			// 	}
+			// 	logger.Printf("Wrote %d bytes\n", written)
+
+			// 	// ioutil.ReadAll()
+
+			// 	// br, err := ioutil.ReadAll(hash)
+			// 	// if err != nil {
+			// 	// 	logger.Fatalln(err)
+			// 	// }
+
+			// 	// logger.Printf("Hash routine has %d bytes\n", len(br))
+			// 	// br2, err := hash.Write(br)
+			// 	// if err != nil {
+			// 	// 	logger.Fatalln(err)
+			// 	// }
+			// 	// logger.Printf("Hashed %d bytes\n", hash.Size())
+			// 	encoded := hex.EncodeToString(hash.Sum(nil))
+			// 	logger.Println()
+			// 	for _, channel := range chanArray {
+			// 		logger.Println("Sending hash")
+			// 		channel <- encoded
+			// 	}
+			// }()
+
+			go f.processFile(&writers, file)
+
+			wg.Wait()
+			logger.Printf("Finished syncing %s to backends\n", file)
+		}(file, &filesWg)
+	}
+	filesWg.Wait()
+	logger.Println("Sync has finished")
+}
+
 // Start - Start watching for File events
 func (f *FileManager) Start(eventChannel <-chan fsnotify.Event, errorChannel <-chan error) {
+	// Before starting everything, check to ensure that our initial state is up to date, if that's what we're configured to do
+	if f.config.SyncOnStartup {
+		logger.Println("Synchronizing file roots with backend")
+		for path, remote := range f.watcherRoots {
+			f.syncFiles(path, remote)
+		}
+	}
+
 	fileNameChannel := make(chan BackerEvent)
 	batchedChannel := make(chan BackerEvent)
 	go f.handleFileEvents(f.config, eventChannel, errorChannel, fileNameChannel)
@@ -83,7 +196,7 @@ func (f *FileManager) RegisterWatcherPath(path string, remoteRoot string) {
 	f.watcherRoots[path] = remoteRoot
 }
 
-func (f *FileManager) handleFileEvents(config *backerConfig, eventChannel <-chan fsnotify.Event, errorChannel <-chan error, outputChannel chan<- BackerEvent) {
+func (f *FileManager) handleFileEvents(config *shared.BackerConfig, eventChannel <-chan fsnotify.Event, errorChannel <-chan error, outputChannel chan<- BackerEvent) {
 	logger.Println("Launching new file handler")
 	for {
 		select {
@@ -164,10 +277,15 @@ func (f *FileManager) handleFileUpload(event *BackerEvent) {
 	wg.Add(len(*f.uploaders))
 
 	uploaderRef := f.uploaders
-	var pipeWriters = make([]io.Writer, len(*uploaderRef)+1)
-	var checksumChannels = make([]chan string, len(*uploaderRef))
+	var pipeWriters = make([]io.Writer, len(*uploaderRef))
 
 	watcherPath := f.watcherRoots[event.Path]
+
+	// Do the checksumming
+	checksum, err := f.checksumFile(event.Path)
+	if err != nil {
+		logger.Fatalln(err)
+	}
 
 	logger.Printf("Uploading %s to %s\n", event.Path, watcherPath)
 	for idx, uploader := range *f.uploaders {
@@ -175,22 +293,16 @@ func (f *FileManager) handleFileUpload(event *BackerEvent) {
 		reader, writer := io.Pipe()
 		pipeWriters[idx] = writer
 
-		// Make a checksum channel
-		var checksumChan = make(chan string, 2)
-		checksumChannels[idx] = checksumChan
-
-		go func(u Uploader, event *BackerEvent) {
+		go func(u backends.Uploader, event *BackerEvent) {
 			defer wg.Done()
-			u.UploadFile(event.Path, reader, watcherPath, checksumChan)
+			u.UploadFile(event.Path, reader, watcherPath, checksum)
 		}(uploader, event)
 	}
 
 	// Create a new Hash function to checksum the file
-	hash := sha256.New()
-	pipeWriters[len(pipeWriters)-1] = hash
-
-	// Do the checksumming
-	go f.checksumFile(hash, &wg, &checksumChannels)
+	// hashr, hashw := io.Pipe()
+	// hash := sha256.New()
+	// pipeWriters[len(pipeWriters)-1] = hashw
 
 	// Run this in a go routine, so that way when it returns, we close all the writers, otherwise they'll deadlock and never stop reading
 	go f.processFile(&pipeWriters, event.Path)
@@ -198,26 +310,29 @@ func (f *FileManager) handleFileUpload(event *BackerEvent) {
 
 	// }()
 	wg.Wait()
-	logger.Printf("Wait done, closing %d channels", len(checksumChannels))
-	for _, channel := range checksumChannels {
-		close(channel)
-	}
 	// Unlock the file
 	// logger.Println("Unlocking file")
 	logger.Printf("Finished uploading %s\n", event.Path)
 }
 
-func (f *FileManager) checksumFile(hash hash.Hash, wg *sync.WaitGroup, checksumChannels *[]chan string) {
+func (f *FileManager) checksumFile(filename string) (string, error) {
 
-	wg.Add(1)
-	defer wg.Done()
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	_, err = io.Copy(hash, file)
+	if err != nil {
+		return "", err
+	}
 
 	// Get the hash value and send it along to the backends
 	hashString := hex.EncodeToString(hash.Sum(nil))
 	logger.Println(hashString)
-	for _, channel := range *checksumChannels {
-		channel <- hashString
-	}
+	return hashString, nil
 }
 
 func (f *FileManager) processFile(pipeWriters *[]io.Writer, filename string) {
@@ -241,6 +356,21 @@ func (f *FileManager) processFile(pipeWriters *[]io.Writer, filename string) {
 	// Create a multiwriter and read everything into it
 	mw := io.MultiWriter(*pipeWriters...)
 	logger.Println("Reading from file")
-	io.Copy(mw, file)
-	logger.Println("Finished reading to pipes")
+	bytes, err := io.Copy(mw, file)
+	if err != nil {
+		logger.Fatalln(err)
+	}
+	logger.Printf("Finished reading %d bytes to pipes\n", bytes)
+}
+
+func isDir(path string) (bool, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+
+	if fi.Mode().IsDir() {
+		return true, nil
+	}
+	return false, nil
 }

@@ -1,7 +1,8 @@
-package daemon
+package backends
 
 import (
 	"io"
+	"log"
 	"path"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -12,16 +13,37 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
+// This needs to be capitalized
+const checksumKey = "Checksum"
+
 // S3Uploader struct which contains configuration settings for managing S3 Buckets
 type S3Uploader struct {
 	session *session.Session
 	client  *s3.S3
-	config  *s3Options
+	config  *S3Options
+}
+
+// S3Options - Options struct for S3 backend
+type S3Options struct {
+	Region            string        `json:"region"`
+	Bucket            string        `json:"bucket"`
+	BucketRoot        string        `json:"bucketRoot"`
+	Credentials       S3Credentials `json:"credentials"`
+	Versioning        bool          `json:"versioning"`
+	ReducedRedundancy bool          `json:"reducedRedundancy"`
+}
+
+// S3Credentials - Credentials for S3
+type S3Credentials struct {
+	AccessKeyID     string
+	SecretAccessKey string
+	SessionToken    string
+	ProviderName    string
 }
 
 // NewS3Uploader creates a new S3 manager to sync objects
-func NewS3Uploader(options *s3Options) *S3Uploader {
-	logger.Println("Creating new S3 Client")
+func NewS3Uploader(options *S3Options) *S3Uploader {
+	log.Println("Creating new S3 Client")
 	sess := session.New(&aws.Config{
 		Region:      aws.String(options.Region),
 		Credentials: credentials.NewStaticCredentials(options.Credentials.AccessKeyID, options.Credentials.SecretAccessKey, options.Credentials.SessionToken),
@@ -39,8 +61,75 @@ func NewS3Uploader(options *s3Options) *S3Uploader {
 	return s3Uploader
 }
 
+// GetName - Specifies that this is an S3 backend
+func (s *S3Uploader) GetName() string {
+	return "S3"
+}
+
+// DeleteFile from S3 Bucket
+func (s *S3Uploader) DeleteFile(name string, remoteRoot string) {
+	if s.config.Versioning {
+		s.deleteVersionedObject(s.buildObjectKey(name, remoteRoot))
+	} else {
+		s.deleteObject(s.buildObjectKey(name, remoteRoot))
+	}
+}
+
+// UploadFile to S3 Bucket
+func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string, checksum string) {
+	// Check if the file exists and if it matches what I need
+	// objectHead := s.getObjectDetails(s.buildObjectKey(name, remoteRoot))
+	// if objectHead != nil {
+	// 	log.Println("Object exists")
+	// 	log.Println(objectHead.Metadata)
+	// }
+
+	// file, err := os.Open(name)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// defer file.Close()
+
+	// checksumChannel := make(chan string)
+	// go func() {
+	// 	checksumChannel <- generateSHA256Hash(data)
+	// }()
+	err := s.uploadObject(name, remoteRoot, data, checksum)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+// FileInSync - Check that S3 has the latest version of the file, and upload if not. Returns whether or not the file is in sync
+func (s *S3Uploader) FileInSync(name string, remotePath string, data io.Reader, checksum string) (bool, error) {
+
+	objectKey := s.buildObjectKey(name, remotePath)
+	head, err := s.client.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(s.config.Bucket),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		if requestErr, ok := err.(s3.RequestFailure); ok {
+			// If the code is 404, that's fine, continue
+			if requestErr.StatusCode() == 404 {
+				s.UploadFile(name, data, remotePath, checksum)
+				return false, nil
+			}
+			return false, err
+		}
+		return false, err
+	}
+	oldChecksum := head.Metadata[checksumKey]
+	// Upload the file
+	if *oldChecksum != checksum {
+		s.UploadFile(name, data, remotePath, checksum)
+		return false, nil
+	}
+	return true, nil
+}
+
 func (s *S3Uploader) createBucket() {
-	logger.Println("Creating bucket:", s.config.Bucket)
+	log.Println("Creating bucket:", s.config.Bucket)
 	_, err := s.client.CreateBucket(&s3.CreateBucketInput{
 		Bucket: aws.String(s.config.Bucket),
 	})
@@ -49,11 +138,11 @@ func (s *S3Uploader) createBucket() {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
 			case "BucketAlreadyExists":
-				logger.Panicf("Bucket %s already exists in the S3 system\nBuckets must have unique names.", s.config.Bucket)
+				log.Fatalf("Bucket %s already exists in the S3 system\nBuckets must have unique names.", s.config.Bucket)
 			case "BucketAlreadyOwnedByYou":
-				logger.Printf("Bucket %s already exists", s.config.Bucket)
+				log.Printf("Bucket %s already exists", s.config.Bucket)
 			default:
-				logger.Panicln(awsErr)
+				log.Panicln(awsErr)
 			}
 		}
 	}
@@ -83,9 +172,9 @@ func (s *S3Uploader) createBucket() {
 
 func (s *S3Uploader) uploadObject(name string, remoteRoot string, object io.Reader, checksum string) error {
 	// Setup the metadata
-	logger.Println("Metadata:", checksum)
+	log.Println("Metadata:", checksum)
 	metadata := make(map[string]*string)
-	metadata["checksum"] = aws.String(checksum)
+	metadata[checksumKey] = aws.String(checksum)
 
 	// Set the redundency
 	var storage string
@@ -97,7 +186,7 @@ func (s *S3Uploader) uploadObject(name string, remoteRoot string, object io.Read
 
 	uploader := s3manager.NewUploader(s.session)
 	objectKey := s.buildObjectKey(name, remoteRoot)
-	logger.Println("Uploading:", objectKey)
+	log.Println("Uploading:", objectKey)
 	result, err := uploader.Upload(&s3manager.UploadInput{
 		Body:         object,
 		Bucket:       aws.String(s.config.Bucket),
@@ -108,7 +197,7 @@ func (s *S3Uploader) uploadObject(name string, remoteRoot string, object io.Read
 	if err != nil {
 		return err
 	}
-	logger.Printf("Uploaded %s to %s", name, result.Location)
+	log.Printf("Uploaded %s to %s", name, result.Location)
 	return nil
 }
 
@@ -123,7 +212,7 @@ func (s *S3Uploader) getObjectDetails(key string) *s3.HeadObjectOutput {
 			case "NoSuchKey":
 				return nil
 			default:
-				logger.Panicln(awsErr)
+				log.Panicln(awsErr)
 			}
 		}
 	}
@@ -137,12 +226,12 @@ func (s *S3Uploader) deleteObject(key string) {
 	})
 
 	if err != nil {
-		logger.Println(err)
+		log.Println(err)
 	}
 }
 
 func (s *S3Uploader) deleteVersionedObject(key string) {
-	logger.Println("Removing versioned object:", key)
+	log.Println("Removing versioned object:", key)
 	// Get the first page of versions
 	var versions []*string
 	isTruncated := true
@@ -154,9 +243,9 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 			VersionIdMarker: nextVersion,
 		})
 		if err != nil {
-			logger.Println(err)
+			log.Println(err)
 		}
-		logger.Println(resp)
+		log.Println(resp)
 		for _, version := range resp.Versions {
 			if *version.Key == key {
 				versions = append(versions, version.VersionId)
@@ -174,7 +263,7 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 			VersionId: version,
 		})
 	}
-	logger.Println(deleteObjects)
+	log.Println(deleteObjects)
 	if len(deleteObjects) > 0 {
 		deleteRequest := &s3.DeleteObjectsInput{
 			Bucket: aws.String(s.config.Bucket),
@@ -185,46 +274,8 @@ func (s *S3Uploader) deleteVersionedObject(key string) {
 		// Now, delete them
 		_, err := s.client.DeleteObjects(deleteRequest)
 		if err != nil {
-			logger.Println(err)
+			log.Println(err)
 		}
-	}
-}
-
-// UploadFile to S3 Bucket
-func (s *S3Uploader) UploadFile(name string, data io.Reader, remoteRoot string, checksumChannel chan string) {
-	// Check if the file exists and if it matches what I need
-	// objectHead := s.getObjectDetails(s.buildObjectKey(name, remoteRoot))
-	// if objectHead != nil {
-	// 	logger.Println("Object exists")
-	// 	logger.Println(objectHead.Metadata)
-	// }
-
-	// file, err := os.Open(name)
-	// if err != nil {
-	// 	logger.Println(err)
-	// }
-	// defer file.Close()
-
-	// checksumChannel := make(chan string)
-	// go func() {
-	// 	checksumChannel <- generateSHA256Hash(data)
-	// }()
-
-	logger.Println("Waiting for checksum")
-	sum := <-checksumChannel
-	logger.Println("Checksummed")
-	err := s.uploadObject(name, remoteRoot, data, sum)
-	if err != nil {
-		logger.Println(err)
-	}
-}
-
-// DeleteFile from S3 Bucket
-func (s *S3Uploader) DeleteFile(name string, remoteRoot string) {
-	if s.config.Versioning {
-		s.deleteVersionedObject(s.buildObjectKey(name, remoteRoot))
-	} else {
-		s.deleteObject(s.buildObjectKey(name, remoteRoot))
 	}
 }
 
