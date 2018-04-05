@@ -42,13 +42,17 @@ func main() {
 func buildFlags() []cli.Flag {
 	return []cli.Flag{
 		cli.BoolFlag{
-			Name:  "daemon",
+			Name:  "daemon, d",
 			Usage: "Run the backer daemon",
 		},
 		cli.StringFlag{
 			Name:  "config, c",
 			Value: "./config.json",
 			Usage: "Load config from `FILE`",
+		},
+		cli.BoolFlag{
+			Name:  "debug",
+			Usage: "Enabled debug logging",
 		},
 	}
 }
@@ -85,6 +89,12 @@ func buildCommnds() []cli.Command {
 }
 
 func parseFlags(c *cli.Context) error {
+	// Enable debug log output
+	if c.Bool("debug") {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	// Start daemon
 	if c.Bool("daemon") {
 		log.Println("Launching daemon")
 		daemon.Start(c.String("config"))
