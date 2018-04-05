@@ -35,3 +35,5 @@ test/
 debug
 bin/
 *.deb
+backer
+*.config.json
