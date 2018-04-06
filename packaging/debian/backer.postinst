@@ -1,3 +1,6 @@
 # Add service user
 adduser --system --disabled-password --disabled-login --home /var/empty \
         --no-create-home --quiet --force-badname --group backer
+
+# Change the folder permissions
+chown -R backer:backer /etc/backer

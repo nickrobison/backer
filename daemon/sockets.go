@@ -25,6 +25,8 @@ func getSocket() (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Open up permissions
+	os.Chmod(unixSocket, 0777)
 	return l, nil
 }
 

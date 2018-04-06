@@ -15,4 +15,4 @@ StartLimitIntervalSec=60
 ExecStart=/usr/bin/backer --config=/etc/backer/config.json --daemon
  
 [Install]
-WantedBy=multi-user.target`
+WantedBy=multi-user.target
