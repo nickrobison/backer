@@ -1,8 +1,9 @@
-VERSION := $(shell cat VERSION)
+VERSION_RELEASE = $(subst -, ,$(shell cat VERSION))
+VERSION := $(word 1, $(VERSION_RELEASE))
 PKGNAME := backer
 LICENSE := MIT
 URL := http://github.com/nickrobison/backer
-RELEASE := 1
+RELEASE := $(word 2, $(VERSION_RELEASE))
 USER := backer
 DESC := Simple backup client for syncing config files to the clouds
 MAINTAINER := Nick Robison <nick@nickrobison.com>
